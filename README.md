@@ -2,7 +2,7 @@
 
 # 🐘 - 33-Administracja-PostgreSQL-Sages – Materiały szkoleniowe
 
-Witaj! Tu znajdziesz wszystkie materiały do szkolenia **PostgreSQL - programowanie w pgPL/SQL**.
+Witaj! Tu znajdziesz wszystkie materiały do szkolenia **PostgreSQL - administracja**.
 
 ---
 ## 📋 Godziny szkolenia:
@@ -19,7 +19,7 @@ Przed szkoleniem zainstaluj:
    - macOS: https://www.postgresql.org/download/macosx/
    - Linux: `sudo apt install postgresql` (Ubuntu/Debian)
 
-2. **Klient SQL** – wybierz jeden:
+2. **Klient SQL**:
    - [DBeaver](https://dbeaver.io/download/) ✅ 
 
 ---
