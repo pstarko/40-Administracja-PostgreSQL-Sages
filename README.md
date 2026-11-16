@@ -1,4 +1,4 @@
-# 40---Administracja-PostgreSQL---Sages
+# 40-Administracja-PostgreSQL-Sages
 
 # 🐘 - 33-Administracja-PostgreSQL-Sages – Materiały szkoleniowe
 
@@ -36,4 +36,4 @@ Przed szkoleniem zainstaluj:
 
 
 ```bash
-git clone https://github.com/pstarko/40---Administracja-PostgreSQL---Sages.git
+git clone https://github.com/pstarko/40-Administracja-PostgreSQL-Sages.git
