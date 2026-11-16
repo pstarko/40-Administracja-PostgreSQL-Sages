@@ -1,6 +1,4 @@
-# 40-Administracja-PostgreSQL-Sages
-
-# 🐘 - 33-Administracja-PostgreSQL-Sages – Materiały szkoleniowe
+# 🐘 - 40-Administracja-PostgreSQL-Sages - materiały szkoleniowe
 
 Witaj! Tu znajdziesz wszystkie materiały do szkolenia **PostgreSQL - administracja**.
 
