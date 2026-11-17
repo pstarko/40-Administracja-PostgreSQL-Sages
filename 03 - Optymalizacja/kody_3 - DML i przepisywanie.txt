@@ -1,0 +1,96 @@
+--Ciemna strona indeksowania!
+
+DROP TABLE IF EXISTS index_write_test;
+
+CREATE TABLE index_write_test (
+    order_id        BIGSERIAL PRIMARY KEY,
+    customer_id     BIGINT NOT NULL,
+    order_date      DATE NOT NULL,
+    status          TEXT NOT NULL,
+    shipping_region TEXT NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+SELECT setseed(0.42);
+
+
+EXPLAIN (ANALYZE, BUFFERS)
+INSERT INTO index_write_test (
+    customer_id,
+    order_date,
+    status,
+    shipping_region,
+    created_at
+)
+    SELECT
+        1 + floor(random() * 50000)::bigint,
+        CURRENT_DATE - floor(random() * 730)::int,
+        CASE
+            WHEN random() < 0.72 THEN 'completed'
+            WHEN random() < 0.86 THEN 'shipped'
+            WHEN random() < 0.94 THEN 'pending'
+            WHEN random() < 0.98 THEN 'cancelled'
+            ELSE 'returned'
+        END,
+        (ARRAY[
+            'North America',
+            'Europe',
+            'Asia Pacific',
+            'Latin America'
+        ])[1 + floor(random() * 4)::int],
+        now() - (random() * interval '2 years')
+    FROM generate_series(1, 100000);
+
+--Insert on index_write_test  (cost=0.00..8250.00 rows=0 width=0) (actual time=293.601..293.602 rows=0.00 loops=1)
+--  Buffers: shared hit=401908 read=1 dirtied=1286 written=1287
+
+TRUNCATE TABLE index_write_test RESTART IDENTITY;
+
+CREATE INDEX idx_write_test_order_date
+ON index_write_test (order_date);
+
+CREATE INDEX idx_write_test_status
+ON index_write_test (status);
+
+CREATE INDEX idx_write_test_region
+ON index_write_test (shipping_region);
+
+CREATE INDEX idx_write_test_status_region
+ON index_write_test (status, shipping_region);
+
+CREATE INDEX idx_write_test_created_at
+ON index_write_test (created_at);
+
+
+EXPLAIN (ANALYZE, BUFFERS)
+INSERT INTO index_write_test (
+    customer_id,
+    order_date,
+    status,
+    shipping_region,
+    created_at
+)
+SELECT
+    1 + floor(random() * 50000)::bigint,
+    CURRENT_DATE - floor(random() * 730)::int,
+    CASE
+        WHEN random() < 0.72 THEN 'completed'
+        WHEN random() < 0.86 THEN 'shipped'
+        WHEN random() < 0.94 THEN 'pending'
+        WHEN random() < 0.98 THEN 'cancelled'
+        ELSE 'returned'
+    END,
+    (ARRAY[
+        'North America',
+        'Europe',
+        'Asia Pacific',
+        'Latin America'
+    ])[1 + floor(random() * 4)::int],
+    now() - (random() * interval '2 years')
+FROM generate_series(1, 100000);
+
+
+
+DROP TABLE IF EXISTS index_write_test;
+
+
