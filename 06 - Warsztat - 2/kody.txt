@@ -29,3 +29,17 @@ SELECT (random() * 10000)::int + 1,
 FROM generate_series(1, 1000000) AS g;
 
 ANALYZE zamowienia;
+
+
+SELECT count(*) FROM zamowienia;
+
+--102 MB	21 MB	123 MB
+SELECT pg_size_pretty(pg_table_size('zamowienia'))          AS tabela,
+       pg_size_pretty(pg_indexes_size('zamowienia'))        AS indeksy,
+       pg_size_pretty(pg_total_relation_size('zamowienia')) AS razem;
+
+--12988	1000000
+SELECT relpages, reltuples::bigint
+FROM pg_class WHERE relname = 'zamowienia';
+
+
