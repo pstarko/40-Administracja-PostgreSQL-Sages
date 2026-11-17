@@ -94,3 +94,65 @@ FROM generate_series(1, 100000);
 DROP TABLE IF EXISTS index_write_test;
 
 
+
+--query transformer
+explain
+select * from orders
+where status in ('completed','shipped')
+
+explain
+select * from orders
+where  status = ANY ('{completed,shipped}'::text[])
+
+
+/*
+ * Limit  (cost=8039924.56..8039924.62 rows=25 width=44) (actual time=12859.000..12859.288 rows=25.00 loops=1)
+  Buffers: shared hit=3055104 read=91
+ */
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    o.order_id,
+    o.order_date,
+    (
+        SELECT SUM(oi.quantity * oi.unit_price)
+        FROM order_items oi
+        WHERE oi.order_id = o.order_id
+    ) AS total_amount
+FROM orders o
+WHERE o.customer_id BETWEEN 1000 AND 1100
+  AND o.order_date >= CURRENT_DATE - INTERVAL '180 days'
+ORDER BY total_amount DESC
+LIMIT 25;
+
+/*
+ * Limit  (cost=29131.51..29131.57 rows=25 width=44) (actual time=107.446..116.300 rows=25.00 loops=1)
+  Buffers: shared hit=17671
+  
+ */
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    o.order_id,
+    o.order_date,
+    SUM(oi.quantity * oi.unit_price) AS total_amount
+FROM orders o
+JOIN order_items oi
+    ON oi.order_id = o.order_id
+WHERE o.customer_id BETWEEN 1000 AND 1100
+  AND o.order_date >= CURRENT_DATE - INTERVAL '180 days'
+GROUP BY
+    o.order_id,
+    o.order_date
+ORDER BY total_amount DESC
+LIMIT 25;
+
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    o.order_id,
+    o.order_date
+FROM orders o left JOIN order_items oi  ON oi.order_id = o.order_id
+
+
+
+
+
