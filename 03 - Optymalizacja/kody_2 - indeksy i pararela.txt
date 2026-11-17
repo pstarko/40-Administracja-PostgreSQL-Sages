@@ -1,0 +1,89 @@
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    o.order_id,
+    o.order_date,
+    c.customer_name,
+    SUM(oi.quantity * oi.unit_price) AS total_amount
+FROM orders o
+JOIN customers c
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON oi.order_id = o.order_id
+WHERE o.order_date >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY
+    o.order_id,
+    o.order_date,
+    c.customer_name
+ORDER BY total_amount DESC
+LIMIT 25;
+
+
+show max_parallel_workers_per_gather;
+
+SHOW min_parallel_table_scan_size;
+SHOW min_parallel_index_scan_size;
+
+SHOW parallel_setup_cost;
+
+
+DROP INDEX IF EXISTS idx_orders_order_date;
+
+ANALYZE orders;
+ANALYZE order_items;
+ANALYZE customers;
+
+CREATE INDEX idx_orders_order_date
+ON orders (order_date);
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    o.order_id,
+    o.order_date,
+    c.customer_name,
+    SUM(oi.quantity * oi.unit_price) AS total_amount
+FROM orders o
+JOIN customers c
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON oi.order_id = o.order_id
+WHERE o.order_date >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY
+    o.order_id,
+    o.order_date,
+    c.customer_name
+ORDER BY total_amount DESC
+LIMIT 25;
+
+DROP INDEX IF EXISTS idx_orders_order_date_status;
+
+--kompozyt
+CREATE INDEX idx_orders_order_date_status
+ON orders (order_date, status);
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    o.order_id,
+    o.order_date,
+    o.status,
+    c.customer_name,
+    SUM(oi.quantity * oi.unit_price) AS total_amount
+FROM orders o
+JOIN customers c
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON oi.order_id = o.order_id
+WHERE o.order_date >= CURRENT_DATE - INTERVAL '30 days'
+  AND o.status = 'completed'
+GROUP BY
+    o.order_id,
+    o.order_date,
+    o.status,
+    c.customer_name
+ORDER BY total_amount DESC
+LIMIT 25;
+
+
+
+
+
+
