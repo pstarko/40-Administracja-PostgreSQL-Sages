@@ -1,0 +1,31 @@
+CREATE DATABASE warsztat_wal;
+
+CREATE EXTENSION pgstattuple;   -- statystyki krotek i wolnego miejsca
+CREATE EXTENSION pg_visibility; -- podgląd visibility map
+CREATE EXTENSION pg_walinspect; -- odczyt WAL z poziomu SQL
+
+SELECT version();
+SHOW wal_level;
+SHOW wal_compression;
+SHOW checkpoint_timeout;
+SHOW max_wal_size;
+
+
+CREATE TABLE zamowienia (
+    id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    klient_id  integer       NOT NULL,
+    kwota      numeric(10,2) NOT NULL,
+    status     text          NOT NULL,
+    utworzono  timestamptz   NOT NULL,
+    opis       text
+) WITH (autovacuum_enabled = false);
+
+INSERT INTO zamowienia (klient_id, kwota, status, utworzono, opis)
+SELECT (random() * 10000)::int + 1,
+       round((random() * 1000)::numeric, 2),
+       (ARRAY['nowe','oplacone','wyslane','dostarczone'])[1 + (g % 4)],
+       now() - (g || ' seconds')::interval,
+       md5(g::text)
+FROM generate_series(1, 1000000) AS g;
+
+ANALYZE zamowienia;
