@@ -1,0 +1,222 @@
+--Transakcje
+
+/*
+Domyślnie w PostgreSQL każda operacja DML (insert, update, delete, merge) i DDL (create table etc.) jest automatycznie zatwierdzana.
+
+Chcąc wykonać wiele operacji w ramach jednej transakcji, musimy rozpocząć od "begin" lub "begin work", wykonać te operacje, a 
+następnie zatwierdzić operację za pomocą "commit" albo "commit work": 
+*/
+
+begin; 
+update emp set salary=salary-100 where emp_id=100; 
+update emp set salary=salary+100 where emp_id=200; 
+commit; 
+
+--wycofanie transakcji - ROLLBACK
+begin
+insert INTO
+commit
+update
+ROLLBACK
+
+--wycofanie tylko update
+
+insert INTO
+delete
+ROLLBACK
+
+--nie wycofa nic
+
+--Blokady
+/*
+Istnieją dwa tryby blokad : 
+	- blokada współdzielona - taka blokada pozwala innym sesjom odczytywać, ale nie pozwala na zmianę zablokowanych danych, 
+	- blokada wyłączna - nie pozwala ani czytać, ani zmieniać zablokowanych danych.
+
+Domyślnie w PostgreSQL działa blokada współdzielona. 
+Jeśli jakaś sesja rozpocznie transakcję i zmieni dane, inne sesje do czasu zatwierdzenia owej transakcji będą mogły odczytywać 
+oryginalną postać danych, ale nie będą mogły tych danych zmieniać. 
+
+Wiersze i tabele mogą być blokowane tylko w ramach transakcji. 
+Po jej zakończeniu są natychmiast odblokowywane. 
+
+Blokada może być nakładana niejawnie za pomocą komend "update" lub "delete" na wiersze, których dotyczyć będzie operacja, 
+lub jawnie za pomocą komend "lock" lub "for update". 
+
+W przypadku "update", "delete" i "for update" blokada będzie dotyczyć tylko tych wierszy, których dotyczy operacja. 
+
+Blokowany jest zawsze cały wiersz. 
+
+Może dojść do sytuacji zakleszczenia. 
+Na przykład sesje A i B rozpoczynają transakcję. 
+Sesja A zmienia wiersze w tabeli X, sesja B zmienia wiersze w tabeli Y. 
+Następnie sesja A usiłuje zmieniać wiersze zablokowane przez sesję B w tabeli Y, a sesja B usiłuje zmieniać wiersze zablokowane przez 
+sesję A w tabeli X. 
+Taki pat nazywamy zakleszczeniem. 
+
+Obie sesje blokują się wzajemnie. 
+
+Po pewnym czasie w jednej z sesji dostaniemy komunikat: ,,Deadlock detected". 	
+*/
+
+-- Jawne blokowanie wierszy
+/*
+W celu uniknięcia zakleszczeń lub aby w międzyczasie ktoś nam nie zablokował wierszy, możemy jawnie zablokować wiersze lub tabelę. 
+Dzięki temu będziemy mieli pewność, że zmiany wprowadzane przez inne sesje nie będą kolidowały z naszymi. 
+Wiersze możemy zablokować komendą np. 
+*/
+
+begin work; 
+select * from produkty where cena>800 for update; 
+	
+/*
+Zadziała to jednak tylko wtedy, jeśli będziemy mieli rozpoczętą transakcję! 
+Wiersze pozostaną zablokowane do czasu zakończenia naszej transakcji. 
+Możemy też zablokować całą tabelę: 
+*/
+	
+begin work; 
+lock table produkty; 
+	
+/*
+Tutaj mamy jednak aż dwa obostrzenia. 
+Po pierwsze, działa to tylko w ramach transakcji. 
+Po drugie, blokuje wszelki dostęp do tabeli w tym odczyt, gdyż jest to blokada wyłączna (ekskluzywna)! 
+*/
+
+
+--Wykrywanie aktywnych blokad 
+/*
+W systemach transakcyjnych często dochodzi do sytuacji, w której jakaś sesja usiłuje dokonać zmiany na wierszach 
+zablokowanych przez transakcję innej sesji i w związku z tym czeka na zwolnienie blokady. 
+
+Ta sesja mogła wcześniej zablokować inne zasoby, które usiłują zmieniać inne sesje itd. 
+Tym sposobem blokady nam się nawarstwiają, aż w skrajnej sytuacji "zawiśnie" cały system korzystający z tej bazy danych. 
+
+Skąd możemy wiedzieć, jakie blokady występują i kto je nakłada jakim zapytaniem? 
+Możemy się tego dowiedzieć ze słownika "pg_locks". 
+
+W związku z tym tworzymy tabelę i umieszczamy w niej dane: 
+*/
+
+create table blokada(x integer, y numeric); 
+
+insert into blokada values ( 1, 10); 
+
+--na terminalu
+begin;
+update blokada set y = 30;
+
+/*
+Operacji  nie zatwierdzamy, by pozostawić trwającą blokadę. 
+Rozpoczynamy też kolejną sesję i usiłujemy za jej pomocą zmodyfikować zablokowane przez 
+pierwszą sesję wiersze: 
+*/
+
+update blokada set y=99; 
+
+/*
+Ta druga sesja oczywiście nie może zablokować wierszy, ponieważ zostały 
+one zablokowane przez pierwszą sesję. 
+W związku z tym sesja zawisa, oczekując na zdjęcie blokady: 
+*/
+
+/*
+Informację o blokadach znajdziemy w słowniku "pg_locks". 
+Znajdują się tu zarówno sesje blokujące jakiś zasób, jak i te oczekujące na możliwość założenia 
+blokady, a nie tylko sesje blokujące. W samym słowniku pg_locks nie zobaczymy 
+zbyt dużo przydatnych informacji: 
+*/
+
+
+-- na nowej sesji
+
+select * from pg_locks
+
+
+select a.pid,pg_blocking_pids(a.pid),mode,nspname ,relname,application_name, 
+usename,client_addr,backend_start,query_start,a.state,query 
+from pg_locks l join pg_class c on l.relation=c.oid join pg_stat_activity a on l.pid=a.pid 
+join pg_catalog.pg_namespace n on c.relnamespace=n.oid 
+where relname='blokada'; 
+
+/*
+Co oznaczają poszczególne kolumny? 
+	"pg_blocking_pids" to efekt działania tak samo nazywającej się funkcji. Znajduje się w tej kolumnie lista PIDów sesji, 
+			które blokują tę sesję. Dzięki temu można rozróżnić, czy dana sesja jest blokująca czy blokowana. 
+	"pid"- identyfikator sesji - za jego pomocą możemy ubić blokującą sesję, stosując funkcję "pg_terminate_backend(pid)" 
+	"mode" - rodzaj blokady 
+	"nspname" - nazwa schematu, w którym znajduje się blokowany obiekt 
+	"relname" - nazwa blokowanego obiektu 
+	"application_name" - nazwa aplikacji, której używa sesja 
+	"usename" -nazwa użytkownika 
+	. "client_addr" - adres ip sesji 
+	"backend_start" - data i czas rozpoczęcia sesji 
+	"query_start" - data i czas rozpoczęcia ostatniego zapytania w tej sesji 
+	"state" - stan sesji 
+	"query"- ostatnie zapytanie w ramach sesji - niekoniecznie to blokujące zapytanie, a dowolne ostatnie zapytanie w tej sesji 
+*/
+
+--precyzyjniejsze zapytanie
+select
+COALESCE(blockingl.relation::regclass::text,blockingl.locktype) as locked_item, now() - blockeda.query_start AS waiting_duration, blockeda.pid AS blocked_pid, blockeda.query as blocked_query, blockedl.mode as blocked_mode, blockinga.pid AS blocking_pid, blockinga.query as blocking_query, 
+blockingl.mode as blocking_mode 
+FROM pg_catalog.pg_locks blockedl 
+JOIN pg_stat_activity blockeda ON blockedl.pid = blockeda.pid JOIN pg_catalog.pg_locks blockingl ON( 
+( (blockingl .transactionid=blockedl.transactionid) OR 
+(blockingl. relation=blockedl. relation AND blockingl .locktype=blockedl .locktype) 
+) AND blockedl.pid != blockingl.pid) 
+JOIN pg_stat_activity blockinga ON blockingl.pid = blockinga.pid 
+AND blockinga.datid = blockeda.datid 
+WHERE NOT blockedl.granted 
+AND blockinga.datname = current_database();
+
+--Rejestrowanie blokad w logach 
+/*
+Nie zawsze zdążymy wychwycić blokadę w chwili, gdy ona trwa, dlatego warto też wiedzieć, w jaki sposób rejestrować takie zdarzenia 
+do logów. 
+
+Istotne tu są dwa parametry - "log_lock_waits" i "deadlock_timeout". 
+
+Parametr "log_lock_waits" jest typu boolean i określa, czy mają być rejestrowane blokady, które trwają dłużej niż czas określony 
+w "deadlock_timeout". Czas ten wynosi domyślnie sekundę. Zmieniając ten parametr, musimy pamiętać. 
+że domyślną jednostką czasu są milisekundy, jeśli nie podamy jednostki. 
+Aby zacząć rejestrowanie blokady, w logach musimy wykonać poniższe polecenia:
+*/ 
+
+alter system set log_lock_waits=on; 
+
+select pg_reload_conf(); 
+
+alter system set deadlock_timeout=30; --czas po jakim blokada ma być zarejestrowana
+select pg_reload_conf(); 
+
+	
+--sprawdź logi
+sudo tail -n 50 /var/log/postgresql/postgresql-18-main.log	
+
+
+--Automatyczne zrywanie sesji po określonym czasie bezczynności w transakcji 
+	
+/*
+Domyślnie ten parametr jest ustawiony na "O", co oznacza, że nie ma żadnego ograniczenia na czas trwania sesji. 
+Domyślną jednostką dla tego parametru Ueśli nie podano jednostki) jest milisekunda. 
+Parametr ten można ustawić dla całego klastra, bazy danych, użytkownika, użytkownika w bazie danych i sesji. 
+*/
+
+set idle_in_transaction_session_timeout=30s; 
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
